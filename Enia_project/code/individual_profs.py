@@ -13,7 +13,7 @@ from colossus.halo import mass_so
 # CONSTANTS
 ###################################################################################################
 
-profile_dir = '/Users/eniaxhakaj/data/profiles/'
+profile_dir = '/Users/fardila/Documents/Data/data_viz/Enia_project/profiles/'
 
 all_sims = ['L1000', 'L0500', 'L0250', 'L0125', 'L0063']
 
@@ -24,7 +24,7 @@ all_sims = ['L1000', 'L0500', 'L0250', 'L0125', 'L0063']
 # array as profiles[0:1], for example.
 
 def density(prof):
-	
+
 	n_profiles = len(prof)
 	n_bins = len(prof[0]['Rbin'])
 	rho = np.zeros((n_profiles, n_bins), np.float)
@@ -33,13 +33,13 @@ def density(prof):
 	dM = prof['mass'][:, 1:] - prof['mass'][:, :-1]
 	rho[:, 0] = prof['mass'][:, 0] / V[:, 0]
 	rho[:, 1:] = dM / dV
-	
+
 	return rho
 
 ###################################################################################################
 
 def potential(prof):
-	
+
 	mask_nonzero = (prof['Rbin_av'] > 1E-10)
 	integrand = prof['mass'] * constants.G
 	integrand[mask_nonzero] /= prof['Rbin_av'][mask_nonzero]**2
@@ -47,15 +47,15 @@ def potential(prof):
 	dr[:, 1:] -= prof['Rbin'][:, :-1]
 	phi = np.cumsum(integrand * dr, axis = 1)
 	phi = phi - phi[:, -1][:, None]
-	
+
 	return phi
 
 ###################################################################################################
 
 def circularVelocity(prof):
-	
+
 	Vc = np.sqrt(prof['mass'] * constants.G / prof['Rbin'])
-	
+
 	return Vc
 
 ###################################################################################################
@@ -66,7 +66,7 @@ def root_s(prof, r1, r2, scale):
 	r_scale = prof[scale]
 	phi = prof['potential']
 	idxh = np.arange(n_prof)
-	
+
 	R1 = r1 * r_scale
 	R2 = r2 * r_scale
 	r = prof['Rbin'][:, :]
@@ -84,7 +84,7 @@ def root_s(prof, r1, r2, scale):
 	phi1 = phi1_0 + (R1 - r1_0) / (r1_1 - r1_0) * (phi1_1 - phi1_0)
 	phi2 = phi2_0 + (R2 - r2_0) / (r2_1 - r2_0) * (phi2_1 - phi2_0)
 	ret = np.sqrt(0.5 * (phi2 - phi1) / np.log(R2 / R1))
-	
+
 	return ret
 
 ###################################################################################################
@@ -93,36 +93,36 @@ def root_s(prof, r1, r2, scale):
 # differ from the catalog values because of unbinding and because of the binning of the profiles.
 
 def vmax(prof):
-	
+
 	Vc = circularVelocity(prof)
 	mask_Rvir = (prof['Rbin'] > prof['Rvir_cat'][:, None])
 	Vc[mask_Rvir] = 0.0
 	ret = np.max(Vc, axis = 1)
-	
+
 	return ret
 
 ###################################################################################################
 
 def load(sim_name, snap, Mvir_min = None, Mvir_max = None, Nvir_min = None, Nvir_max = None,
 		mdefs = ['200c', '500c']):
-	
+
 	# Generate file name
 	simProps = NBodySimulations.getSimulationProperties(sim_name)
-	fn = 'Profiles_%s_Np200_%03d.bhp' % (simProps.folder, snap)	
+	fn = 'Profiles_%s_Np200_%03d.bhp' % (simProps.folder, snap)
 
 	# Check for pickle
 	pickle_file = 'Pickles/' + fn[:-4]
 	if os.path.exists(pickle_file):
-		
+
 		t = time.clock()
 		pFile = open(pickle_file, 'rb')
 		dic = pickle.load(pFile)
 		pFile.close()
 		t = time.clock() - t
-		print('Loaded %s from pickle, took %.2f seconds' % (fn, t))	
-	
+		print('Loaded %s from pickle, took %.2f seconds' % (fn, t))
+
 	else:
-		
+
 		# Open file, get basic info. Then reset the file pointer to the first struct.
 		t = time.clock()
 		f = open(profile_dir + fn, 'rb')
@@ -131,7 +131,7 @@ def load(sim_name, snap, Mvir_min = None, Mvir_max = None, Nvir_min = None, Nvir
 		f.seek(4)
 		struct_str = '3i13f%df' % (n_bins * 5)
 		n_mdefs = len(mdefs)
-				
+
 		# Create a structure numpy array to hold all the data
 		dtypes = []
 		# Fields directly from the binaries
@@ -158,14 +158,14 @@ def load(sim_name, snap, Mvir_min = None, Mvir_max = None, Nvir_min = None, Nvir
 			dtypes.append(('R%s' % mdefs[j], np.float))
 			dtypes.append(('M%s' % mdefs[j], np.float))
 		prof = np.zeros((n_profiles), dtype = dtypes)
-	
+
 		# Read the profiles one by one
 		for i in range(n_profiles):
 			p_data = struct.unpack(struct_str, f.read(struct.calcsize(struct_str)))
 			if i == 0:
 				z = p_data[3]
 				box_size = p_data[4]
-				
+
 				# Prepare computation of mdefs; we need to know z for that
 				thresholds = np.zeros((n_mdefs), np.float)
 				for j in range(n_mdefs):
@@ -185,30 +185,30 @@ def load(sim_name, snap, Mvir_min = None, Mvir_max = None, Nvir_min = None, Nvir
 			prof['mass'][i] = np.array(p_data[16 + 2 * n_bins:16 + 3 * n_bins])
 			prof['vr'][i] = np.array(p_data[16 + 3 * n_bins:16 + 4 * n_bins])
 			prof['sigmav'][i] = np.array(p_data[16 + 4 * n_bins:16 + 5 * n_bins])
-	
+
 		# Pre-compute various quantities
 		prof['vc'] = circularVelocity(prof)
 		prof['vmax_prof'] = vmax(prof)
 		prof['potential'] = potential(prof)
-	
-		# Compute overdensity radii and masses in a fast, somewhat simplistic fashion. First, 
-		# comptue the enclosed overdensity for all profiles and at all radii. Then, simply 
-		# interpolate to find the radii. 
+
+		# Compute overdensity radii and masses in a fast, somewhat simplistic fashion. First,
+		# comptue the enclosed overdensity for all profiles and at all radii. Then, simply
+		# interpolate to find the radii.
 		delta = prof['mass'] / 4.0 / np.pi * 3.0 / prof['Rbin' ]**3
 		max_delta = np.max(delta, axis = 1)
 		min_delta = np.min(delta, axis = 1)
-		
+
 		for j in range(n_mdefs):
 			RDelta = np.zeros((n_profiles), np.float)
 			MDelta = np.zeros((n_profiles), np.float)
-			
+
 			# Filter out profiles that never reach teh density threshold
 			mask_fail = (thresholds[j] < min_delta) | (thresholds[j] > max_delta)
 			RDelta[mask_fail] = -1.0
 			MDelta[mask_fail] = -1.0
 			mask_valid = np.logical_not(mask_fail)
 			delta_valid = delta[mask_valid, :]
-			
+
 			# Now find all bins that bracket the density threshold, and then use the lowest-radius
 			# one of those
 			mask_bins = (delta_valid[:, :-1] >= thresholds[j]) & (delta_valid[:, 1:] < thresholds[j])
@@ -227,7 +227,7 @@ def load(sim_name, snap, Mvir_min = None, Mvir_max = None, Nvir_min = None, Nvir
 
 			prof['R%s' % mdefs[j]] = RDelta
 			prof['M%s' % mdefs[j]] = MDelta
-			
+
 			#ratio = RDelta[mask_valid] / prof['Rvir_cat'][mask_valid]
 			#print(np.mean(ratio), np.median(ratio), np.min(ratio), np.max(ratio))
 
@@ -235,7 +235,7 @@ def load(sim_name, snap, Mvir_min = None, Mvir_max = None, Nvir_min = None, Nvir
 		t_load = time.clock() - t
 
 		t = time.clock()
-		dic = {}	
+		dic = {}
 		dic['profiles'] = prof
 		dic['box_size'] = box_size
 		dic['z'] = z
@@ -248,7 +248,7 @@ def load(sim_name, snap, Mvir_min = None, Mvir_max = None, Nvir_min = None, Nvir
 		dic['sim_name'] = sim_name
 		dic['cosmo_name'] = simProps.cosmo_name
 		dic['particle_mass'] = mp
-		
+
 		output_file = open(pickle_file, 'wb')
 		pickle.dump(dic, output_file, pickle.HIGHEST_PROTOCOL)
 		output_file.close()
