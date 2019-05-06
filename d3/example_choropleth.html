@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+    <title>Choropleth</title>
+    <script src="http://d3js.org/d3.v3.min.js"></script>
+    <script src="http://d3js.org/d3.geo.projection.v0.min.js"></script>
+    <style type="text/css">
+
+    body{
+        background:white;
+    }
+    svg {
+      width: 960px;
+      height: 500px;
+      background: none;
+    }
+    svg:active {
+      cursor: move;
+      cursor: -moz-grabbing;
+      cursor: -webkit-grabbing;
+    }
+    .globe {
+      fill: black;
+      fill-opacity: 1;
+      stroke: #111;
+      stroke-width:1px;
+    }
+    #first_layer path {
+      stroke: #333;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    </style>
+  </head>
+  <body>
+    <script type="text/javascript">
+
+    // Define our SVG element outside our SQL functions
+    var svg = d3.select("body")
+            .append("svg")
+            .call(d3.behavior.zoom()
+                .on("zoom", redraw))
+            .append("g");
+
+    // Define the color scale for our choropleth
+    var fill = d3.scale.linear()
+        .domain([0, 1000, 10000000, 100000000, 1000000000])
+        .range(["#333", "#6ab9fa", "#39a2f8", "#098bf5", "#0666b4"]);
+
+    // Our projection.
+    var xy = d3.geo.robinson();
+
+    // Our path
+    var path = d3.geo.path()
+                .projection(xy);
+
+    // Using the graticule to draw the globe background color
+    var graticule = d3.geo.graticule();
+    svg.append("path")
+        .datum(graticule.outline)
+        .attr("class", "globe")
+        .attr("d", path);
+
+    // Add our first layer
+    svg.append("g").attr("id", "first_layer");
+
+    // Use D3 AJAX method to query CartoDB table
+    d3.json("http://viz2.cartodb.com/api/v2/sql?q=SELECT ST_Simplify(the_geom,0.01) as the_geom, pop2005 as population FROM d3_world_borders WHERE the_geom IS NOT NULL&format=geojson&dp=5", function(collection) {
+          svg.select("#first_layer")
+            .selectAll("path")
+              .data(collection.features)
+            .enter().append("path")
+            .attr("fill", function(d) { 
+              // Return a color from our color ramp based on pop size
+              return fill(d.properties.population); 
+             })
+            .attr("stroke-width", "0.5px")
+            .attr("fill-opacity", "0.7")
+            .on("mouseover", function(t,d){
+              // Mouseover, remove transparency
+              d3.select(this)
+                .attr("stroke-width", "1px")
+                .attr("fill-opacity", "0.9");
+              })
+            .on("mouseout", function(t,d){
+              // Mouseover, replace transparency
+              d3.select(this)
+                .attr("stroke-width", "0.5px")
+                .attr("fill-opacity", "0.7");
+              })
+            .attr("d", path.projection(xy));
+      })
+    // Handles our zoom
+    function redraw() {
+      svg.attr("transform", "translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")");
+    }
+
+    </script>
+  </body>
+</html>
